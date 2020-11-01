@@ -3,13 +3,15 @@
 //  iOS_Project_DietVision
 //
 //  Created by Rohan Patel on 2020-03-07.
-//  Copyright © 2020 Rohan Patel. All rights reserved.
 //
 import UIKit
 import AVKit
 import Vision
+
+// Nishit Amin researched ALAMOFIRE, Swifty JSON and implemented it in my part
 import Alamofire
 import SwiftyJSON
+
 
 class HomePageViewController: UIViewController, AVCaptureVideoDataOutputSampleBufferDelegate, UITextFieldDelegate {
 
@@ -24,14 +26,22 @@ class HomePageViewController: UIViewController, AVCaptureVideoDataOutputSampleBu
     @IBOutlet var userName: UIBarButtonItem!
     var tapGesture = UITapGestureRecognizer()
 
+    //Assigning the Nutrition Info object file for use in the current view controller
     let foodItem = NutritionInfo()
     let captureSession = AVCaptureSession()
     var scanningStarted: Bool = false
+    
+    //Calling app delegate
     var mainDelegate: AppDelegate!
+    //viewDidload method for displaying content on page load.
     override func viewDidLoad() {
         super.viewDidLoad()
+        //assigning app delagate to mainDelegate for use in the current file.
         mainDelegate = UIApplication.shared.delegate as! AppDelegate
-        userName.title = String(mainDelegate.loggedUser.fname)
+       //to display logged user name in top of page.
+        userName.title = String(mainDelegate.loggedUser.fname)+" "+String(mainDelegate.loggedUser.lname)
+        
+        //Calling method for layout of view controller.
         changeUI()
 
         startScanningFood()
@@ -46,10 +56,13 @@ class HomePageViewController: UIViewController, AVCaptureVideoDataOutputSampleBu
     }
 
     @objc func myviewTapped(_ sender: UITapGestureRecognizer) {
-
+        
+        //when food name is tapped will redirect to view info page.
         print("tapped")
         performSegue(withIdentifier: "HomeToViewInfo", sender: self)
     }
+    
+    //Going back to home page
     @IBAction func unwindToHomePageVC(segue: UIStoryboardSegue) {
 
     }
@@ -57,6 +70,8 @@ class HomePageViewController: UIViewController, AVCaptureVideoDataOutputSampleBu
     @IBAction func onDetectedItemClick(sender: UIView) {
 
     }
+    
+    //Method when user wants to stop scannng
     @IBAction func onStopButtonPressed(sender: UIButton) {
         print("CLICKED BUTTON")
         if(scanningStarted) { //scanning is on and user want to stop it
@@ -76,6 +91,7 @@ class HomePageViewController: UIViewController, AVCaptureVideoDataOutputSampleBu
         }
     }
 
+    //Method when user log out return back to home page and reset all credentials fields
     @IBAction func onLogoutPress(sender: UIButton) {
         mainDelegate.loggedUser = User(id: -1, fname: "", lname: "", email: "", age: -1, password: "")
         performSegue(withIdentifier: "HomeToLogin", sender: self)
@@ -84,38 +100,54 @@ class HomePageViewController: UIViewController, AVCaptureVideoDataOutputSampleBu
     @IBAction func textInputFieldReturn(sender: UITextField) {
         fetchFoodDetails()
 
-
     }
 
+    //Getting all the scanned or entered food details
     func fetchFoodDetails() {
+        
+        //API request credentials to fetch data from NutritionX
         let headers: HTTPHeaders = ["x-app-id": "b82bbd59", "x-app-key": "24a07abb3fa97bc24be50bc74dff9bf6"]
+        //request for food
         AF.request("https://trackapi.nutritionix.com/v2/natural/nutrients", method: .post, parameters: ["query": inputFoodTextField.text], headers: headers).responseJSON { response in
             //debugPrint(response.result)
+            //Resturned data from API in json
             let JSONData = JSON(try? response.result.get())
 
+            //Method to store fetched food data
             if(JSONData["message"].string == nil) {
                 print("MATCH FOUND")
 
 
-
+                //Storing all the fetched data here
                 let foodData = JSONData["foods"][0]
 
                 //debugPrint(JSONData)
+                //Stores all the fetched data into variables for future use.
                 self.foodItem.food_name = foodData["food_name"].string!
                 self.foodItem.weight = foodData["serving_weight_grams"].float!
                 self.foodItem.calories = foodData["nf_calories"].float!
                 self.foodItem.photo = foodData["photo"]["thumb"].url!
+                
+                self.foodItem.potassium = foodData["nf_potassium"].float!
+                self.foodItem.totalCarbs = foodData["nf_total_carbohydrate"].float!
+                self.foodItem.protine = foodData["nf_protein"].float!
+                self.foodItem.fat = foodData["nf_total_fat"].float!
+                self.foodItem.sugars = foodData["nf_sugars"].float!
+                self.foodItem.sodium = foodData["nf_sodium"].float!
+             
 
                 self.mainDelegate.foodItem = self.foodItem
                 self.setDetectedItem()
                 debugPrint(self.foodItem.calories)
             } else {
+                //If food is not recognized or invalid
                 print("MATCH NOT FOUND")
                 self.displayNoMatchFoundMessage()
             }
 
         }
     }
+    //Method to set the layout of home page
     func changeUI() {
         //adding border/shadow to search bar
         viewInputFood.layer.shadowColor = UIColor.black.cgColor
@@ -136,6 +168,7 @@ class HomePageViewController: UIViewController, AVCaptureVideoDataOutputSampleBu
         navBar.isTranslucent = true
 
     }
+    //To set the detected food data text and image on home page in uppercase
     func setDetectedItem() {
         self.detectedItemView.isHidden = false
         let data = try? Data(contentsOf: self.foodItem.photo)
@@ -144,6 +177,7 @@ class HomePageViewController: UIViewController, AVCaptureVideoDataOutputSampleBu
 
         self.detectedItemLbl.text = self.foodItem.food_name.uppercased()
     }
+    //Method to display when message is not found
     func displayNoMatchFoundMessage() {
         self.detectedItemView.isHidden = true
 
@@ -152,10 +186,14 @@ class HomePageViewController: UIViewController, AVCaptureVideoDataOutputSampleBu
         alert.addAction(alertAction)
         self.present(alert, animated: true)
     }
+    
+    //Method to return the keyboard on enter.
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         textField.resignFirstResponder()
         return true
     }
+    
+    
     func startScanningFood() {
 
         guard let captureDevice = AVCaptureDevice.default(for: .video) else { return }
